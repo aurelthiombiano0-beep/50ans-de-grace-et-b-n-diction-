@@ -3,10 +3,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ShieldAlert, Key, Search, Users, Check, X, Trash2, ShieldCheck, Download, Ban, MessageSquare } from "lucide-react";
+import { ShieldAlert, Key, Search, Users, Check, X, Trash2, ShieldCheck, Download, Ban, MessageSquare, Bell, BellRing, Volume2, VolumeX, Sparkles, CheckCircle } from "lucide-react";
 import { RSVPEntry } from "../types";
+
+interface NotificationItem {
+  id: string;
+  name: string;
+  isAttending: boolean;
+  guestsCount: number;
+  timestamp: string;
+}
 
 export default function Organisateur() {
   const [passcode, setPasscode] = useState("");
@@ -16,27 +24,119 @@ export default function Organisateur() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "attending" | "absent">("all");
 
+  // Notifications State & Refs
+  const rsvpIdsSetRef = useRef<Set<string>>(new Set());
+  const isFirstLoadRef = useRef(true);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+
   // Valid codes: 50ANS, 2026, or KADIOGO
   const VALID_CODES = ["50ANS", "2026", "KADIOGO", "ALIMA", "DAO"];
 
-  // Load registered RSVPs
+  // Web Audio Synth Chime
+  const playNotificationSound = () => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const audioCtx = new AudioContextClass();
+      
+      const playChime = (time: number, freq: number, duration: number) => {
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, time);
+        
+        gainNode.gain.setValueAtTime(0.12, time);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+        
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        osc.start(time);
+        osc.stop(time + duration);
+      };
+
+      const now = audioCtx.currentTime;
+      playChime(now, 587.33, 0.35); // D5
+      playChime(now + 0.12, 880, 0.55); // A5
+    } catch (err) {
+      console.warn("AudioContext not allowed or not supported", err);
+    }
+  };
+
+  // Force play sound to test and unlock context
+  const testSound = () => {
+    playNotificationSound();
+  };
+
+  // Load registered RSVPs and detect new confirmations
   const loadRSVPs = () => {
     const list = localStorage.getItem("graces_50_rsvps");
     if (list) {
       try {
-        setAllRSVPs(JSON.parse(list));
+        const parsed: RSVPEntry[] = JSON.parse(list);
+        setAllRSVPs(parsed);
+        
+        // Check for new RSVPs
+        const newDetections: RSVPEntry[] = [];
+        parsed.forEach((item) => {
+          if (!rsvpIdsSetRef.current.has(item.id)) {
+            rsvpIdsSetRef.current.add(item.id);
+            if (!isFirstLoadRef.current) {
+              newDetections.push(item);
+            }
+          }
+        });
+
+        // Trigger notifications if there are new RSVPs
+        if (newDetections.length > 0) {
+          if (soundEnabled) {
+            playNotificationSound();
+          }
+
+          const newlyAdded: NotificationItem[] = newDetections.map((item) => ({
+            id: item.id,
+            name: item.name,
+            isAttending: item.isAttending,
+            guestsCount: item.guestsCount || 1,
+            timestamp: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+          }));
+
+          setNotifications((prev) => [...newlyAdded, ...prev].slice(0, 5));
+        }
+
+        isFirstLoadRef.current = false;
       } catch (e) {
         console.error("Failed parsing localStorage RSVPs", e);
       }
+    } else {
+      isFirstLoadRef.current = false;
     }
   };
 
+  // Keep checking localStorage updates when authenticated
   useEffect(() => {
-    // Keep checking localStorage updates when authenticated
     if (isAuthenticated) {
+      // First load: populate set of existing IDs so they don't trigger alerts
+      const list = localStorage.getItem("graces_50_rsvps");
+      if (list) {
+        try {
+          const parsed: RSVPEntry[] = JSON.parse(list);
+          parsed.forEach((item) => rsvpIdsSetRef.current.add(item.id));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      isFirstLoadRef.current = false;
       loadRSVPs();
+
       const interval = setInterval(loadRSVPs, 2000);
       return () => clearInterval(interval);
+    } else {
+      // Clear tracking if logged out
+      rsvpIdsSetRef.current.clear();
+      isFirstLoadRef.current = true;
     }
   }, [isAuthenticated]);
 
@@ -211,6 +311,105 @@ export default function Organisateur() {
                   Déconnexion
                 </button>
               </div>
+            </div>
+
+            {/* Real-time Confirmation Notifications Feed */}
+            <div className="bg-[#141414] border border-[#D4AF37]/30 rounded-2xl p-6 space-y-4 text-left">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-[#D4AF37]/15 pb-4">
+                <div className="flex items-center gap-3">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  </span>
+                  <div className="text-left">
+                    <div className="flex items-center gap-2">
+                      <BellRing className="w-4 h-4 text-[#D4AF37]" />
+                      <span className="font-sans text-xs uppercase tracking-[0.15em] text-[#F8F5F0] font-bold">
+                        Notifications en Direct
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-[#F8F5F0]/40 font-mono block mt-0.5">Écoute en temps réel des fiches et participations</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 self-stretch sm:self-auto justify-end">
+                  <button
+                    onClick={testSound}
+                    className="px-3 py-1.5 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/20 text-[#D4AF37] text-[10px] uppercase tracking-wider font-semibold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                    title="Tester le son de notification"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" /> TESTER SON
+                  </button>
+
+                  <button
+                    onClick={() => setSoundEnabled(!soundEnabled)}
+                    className={`px-3 py-1.5 border rounded-lg text-[10px] uppercase tracking-wider font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      soundEnabled
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
+                        : "bg-red-500/15 text-red-400 border-red-500/20 hover:bg-red-500/25"
+                    }`}
+                  >
+                    {soundEnabled ? (
+                      <>
+                        <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> SON ACTIF
+                      </>
+                    ) : (
+                      <>
+                        <VolumeX className="w-3.5 h-3.5 text-red-400" /> SON MUET
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {notifications.length === 0 ? (
+                <div className="py-2 flex items-center gap-2 text-[#F8F5F0]/50 text-xs italic">
+                  <Sparkles className="w-4 h-4 text-[#D4AF37] shrink-0 animate-pulse" />
+                  <p>En attente de nouvelles fiches de confirmation d’invités... L’écran sonnera et affichera une alerte dès qu’un invité s’inscrira.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                  <AnimatePresence initial={false}>
+                    {notifications.map((notif) => (
+                      <motion.div
+                        key={notif.id}
+                        initial={{ opacity: 0, y: -10, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="p-4 bg-[#1F1912] border border-[#D4AF37]/30 rounded-xl text-white text-xs flex justify-between items-center gap-4 shadow-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
+                          <div className="text-left space-y-1">
+                            <span className="font-serif font-bold text-[#F8F5F0] text-sm">{notif.name}</span>
+                            <span className="text-gray-300"> s'est inscrit : </span>
+                            {notif.isAttending ? (
+                              <span className="text-emerald-400 uppercase font-mono font-bold text-[9px] tracking-wide bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/25">
+                                Présent ({notif.guestsCount} pers.)
+                              </span>
+                            ) : (
+                              <span className="text-orange-400 uppercase font-mono font-bold text-[9px] tracking-wide bg-orange-500/15 px-2 py-0.5 rounded border border-orange-500/25">
+                                Absent
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="font-mono text-[10px] text-[#D4AF37] bg-[#D4AF37]/15 px-2.5 py-1 rounded-md border border-[#D4AF37]/20 font-semibold">
+                            {notif.timestamp}
+                          </span>
+                          <button
+                            onClick={() => setNotifications((prev) => prev.filter((n) => n.id !== notif.id))}
+                            className="text-[#F8F5F0]/40 hover:text-white transition-colors cursor-pointer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              )}
             </div>
 
             {/* Quick Stats Grid */}

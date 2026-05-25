@@ -120,7 +120,7 @@ export default function RSVPForm() {
               <div className="p-5 rounded-2xl bg-[#141414]/90 border border-[#D4AF37]/10 space-y-4">
                 <h4 className="font-serif text-base text-gold-gradient font-medium">Bénédictions &amp; Vœux</h4>
                 <p className="font-sans text-xs text-[#F8F5F0]/60 leading-relaxed">
-                  Laissez un mot d'amour, un verset, ou une bénédiction de 50 ans pour Tata Alima Dao directement dans le formulaire. Vos messages accompagneront sa marche de célébration.
+                  Laissez un mot d'amour, un verset, ou une bénédiction de 50 ans pour Mme Alima OUEDRAOGO directement dans le formulaire. Vos messages accompagneront sa marche de célébration.
                 </p>
               </div>
             </div>

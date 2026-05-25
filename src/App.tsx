@@ -181,7 +181,7 @@ export default function App() {
               {/* Monogram branding signature */}
               <div className="flex items-center gap-3">
                 <span className="font-serif text-xl font-bold tracking-[0.2em] text-gold-gradient">
-                  T.A
+                  M.A
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]" />
                 <span className="font-sans text-[10px] tracking-[0.25em] text-[#F8F5F0]/70 uppercase font-bold hidden sm:inline">
@@ -251,7 +251,7 @@ export default function App() {
                   </div>
 
                   <p className="mt-8 text-base sm:text-lg md:text-xl font-light leading-relaxed max-w-2xl opacity-90 border-t border-b border-[#D4AF37]/30 py-6 px-4 text-center">
-                    À l’occasion de ses 50 ans, Tata Alima Dao vous invite à une soirée exceptionnelle placée sous le signe de l’élégance habillée en Faso Danfani et Bazin (Or, Blanc ou Noir).
+                    À l’occasion de ses 50 ans, Mme Alima OUEDRAOGO vous invite à une soirée exceptionnelle placée sous le signe de l’élégance habillée en Faso Danfani et Bazin (Or, Blanc ou Noir).
                   </p>
                 </motion.div>
 
@@ -360,7 +360,7 @@ export default function App() {
             
             <div className="relative z-10 max-w-md mx-auto space-y-4">
               <h3 className="font-serif text-4xl text-gold-gradient font-bold tracking-widest whitespace-nowrap">
-                T.A • 50 ANS
+                M.A • 50 ANS
               </h3>
               <p className="font-serif italic text-base text-[#F8F5F0] max-w-sm mx-auto leading-relaxed">
                 « Votre précieuse présence rendra cette soirée encore plus magique et mémorable. »

@@ -13,7 +13,7 @@ interface CelebrantPortraitProps {
 
 export default function CelebrantPortrait({
   imageSrc = "/src/assets/images/celebrant_portrait_1779649898310.png",
-  name = "Tata Alima Dao",
+  name = "Mme Alima OUEDRAOGO",
 }: CelebrantPortraitProps) {
   return (
     <div className="relative w-full max-w-[340px] md:max-w-[400px] aspect-[3/4] mx-auto">
