@@ -20,15 +20,33 @@ export default function RSVPForm() {
   const [allRSVPs, setAllRSVPs] = useState<RSVPEntry[]>([]);
   const [formError, setFormError] = useState("");
 
-  // Load existing RSVPs
+  // Load existing RSVPs and synchronize them with the server on mount
   useEffect(() => {
     const list = localStorage.getItem("graces_50_rsvps");
+    let localRSVPs: RSVPEntry[] = [];
     if (list) {
       try {
-        setAllRSVPs(JSON.parse(list));
+        localRSVPs = JSON.parse(list);
+        setAllRSVPs(localRSVPs);
       } catch (e) {
         console.error("Failed parsing localStorage RSVPs", e);
       }
+    }
+
+    // Synchronize local RSVPs to the central database server
+    if (localRSVPs.length > 0) {
+      fetch("/api/rsvps/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(localRSVPs),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          console.log("Local RSVPs synchronized with server:", data);
+        })
+        .catch((err) => {
+          console.error("Failed to sync RSVPs with server:", err);
+        });
     }
   }, []);
 
@@ -64,7 +82,7 @@ export default function RSVPForm() {
       notes: notes.trim(),
     };
 
-    // Load fresh, update and store
+    // Save locally to localStorage as local fallback
     const list = localStorage.getItem("graces_50_rsvps");
     let currentList: RSVPEntry[] = [];
     if (list) {
@@ -77,6 +95,23 @@ export default function RSVPForm() {
     const updated = [newRsvp, ...currentList];
     setAllRSVPs(updated);
     localStorage.setItem("graces_50_rsvps", JSON.stringify(updated));
+
+    // Save to server backend
+    fetch("/api/rsvps", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newRsvp),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Server error");
+        return res.json();
+      })
+      .then(() => {
+        console.log("RSVP details saved to server database successfully.");
+      })
+      .catch((err) => {
+        console.error("Could not send RSVP to server:", err);
+      });
 
     setRecentRSVP(newRsvp);
     setSubmitted(true);

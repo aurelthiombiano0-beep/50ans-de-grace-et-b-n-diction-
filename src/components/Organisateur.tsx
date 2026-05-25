@@ -24,6 +24,16 @@ export default function Organisateur() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "attending" | "absent">("all");
 
+  // Manual guest creation states
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [manualName, setManualName] = useState("");
+  const [manualPhone, setManualPhone] = useState("");
+  const [manualIsAttending, setManualIsAttending] = useState(true);
+  const [manualGuestsCount, setManualGuestsCount] = useState(1);
+  const [manualNotes, setManualNotes] = useState("");
+  const [manualSuccessMsg, setManualSuccessMsg] = useState("");
+  const [manualErrorMsg, setManualErrorMsg] = useState("");
+
   // Notifications State & Refs
   const rsvpIdsSetRef = useRef<Set<string>>(new Set());
   const isFirstLoadRef = useRef(true);
@@ -70,12 +80,14 @@ export default function Organisateur() {
     playNotificationSound();
   };
 
-  // Load registered RSVPs and detect new confirmations
+  // Load registered RSVPs and detect new confirmations from the Server Database API
   const loadRSVPs = () => {
-    const list = localStorage.getItem("graces_50_rsvps");
-    if (list) {
-      try {
-        const parsed: RSVPEntry[] = JSON.parse(list);
+    fetch("/api/rsvps")
+      .then((res) => {
+        if (!res.ok) throw new Error("Could not fetch RSVPs from server");
+        return res.json();
+      })
+      .then((parsed: RSVPEntry[]) => {
         setAllRSVPs(parsed);
         
         // Check for new RSVPs
@@ -107,31 +119,34 @@ export default function Organisateur() {
         }
 
         isFirstLoadRef.current = false;
-      } catch (e) {
-        console.error("Failed parsing localStorage RSVPs", e);
-      }
-    } else {
-      isFirstLoadRef.current = false;
-    }
+      })
+      .catch((err) => {
+        console.error("Failed fetching RSVPs from server API:", err);
+      });
   };
 
-  // Keep checking localStorage updates when authenticated
+  // Keep checking server API updates when authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      // First load: populate set of existing IDs so they don't trigger alerts
-      const list = localStorage.getItem("graces_50_rsvps");
-      if (list) {
-        try {
-          const parsed: RSVPEntry[] = JSON.parse(list);
-          parsed.forEach((item) => rsvpIdsSetRef.current.add(item.id));
-        } catch (e) {
-          console.error(e);
-        }
-      }
-      isFirstLoadRef.current = false;
-      loadRSVPs();
+      // First load: fetch existing RSVPs from server to insert into our notifier check list
+      fetch("/api/rsvps")
+        .then((res) => res.ok && res.json())
+        .then((parsed: RSVPEntry[]) => {
+          if (parsed && Array.isArray(parsed)) {
+            parsed.forEach((item) => rsvpIdsSetRef.current.add(item.id));
+            setAllRSVPs(parsed);
+          }
+          isFirstLoadRef.current = false;
+          // Initial trigger of poller
+          loadRSVPs();
+        })
+        .catch((err) => {
+          console.error("Failed to preloader RSVPs:", err);
+          isFirstLoadRef.current = false;
+          loadRSVPs();
+        });
 
-      const interval = setInterval(loadRSVPs, 2000);
+      const interval = setInterval(loadRSVPs, 3000);
       return () => clearInterval(interval);
     } else {
       // Clear tracking if logged out
@@ -154,10 +169,78 @@ export default function Organisateur() {
 
   const handleDelete = (id: string) => {
     if (confirm("Êtes-vous sûr de vouloir retirer cet invité de la liste ?")) {
+      // Optimistic client update
       const filtered = allRSVPs.filter((r) => r.id !== id);
       setAllRSVPs(filtered);
-      localStorage.setItem("graces_50_rsvps", JSON.stringify(filtered));
+
+      // Perform DELETE request on the server database
+      fetch(`/api/rsvps/${id}`, {
+        method: "DELETE",
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error("Failed to delete from server database.");
+          return res.json();
+        })
+        .then(() => {
+          console.log(`RSVP ${id} deleted on server successfully.`);
+          loadRSVPs();
+        })
+        .catch((err) => {
+          console.error("Could not delete RSVP on server:", err);
+          alert("Erreur lors de la suppression sur le serveur.");
+        });
     }
+  };
+
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setManualErrorMsg("");
+    setManualSuccessMsg("");
+
+    if (!manualName.trim()) {
+      setManualErrorMsg("Le nom complet de l'invité est requis.");
+      return;
+    }
+
+    const newRsvp: RSVPEntry = {
+      id: "vip-admin-" + Math.floor(100000 + Math.random() * 900000),
+      name: manualName.trim(),
+      phone: manualPhone.trim() || "Non spécifié",
+      guestsCount: manualIsAttending ? manualGuestsCount : 0,
+      isAttending: manualIsAttending,
+      timestamp: new Date().toLocaleDateString("fr-FR", {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      notes: manualNotes.trim() || undefined,
+    };
+
+    fetch("/api/rsvps", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newRsvp),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Erreur serveur lors de la sauvegarde.");
+        return res.json();
+      })
+      .then(() => {
+        setManualSuccessMsg(`L'invité "${newRsvp.name}" a été ajouté avec succès !`);
+        // Reset form fields
+        setManualName("");
+        setManualPhone("");
+        setManualIsAttending(true);
+        setManualGuestsCount(1);
+        setManualNotes("");
+        // Reload list from server
+        loadRSVPs();
+      })
+      .catch((err) => {
+        console.error("Manual add failed:", err);
+        setManualErrorMsg("Erreur lors de l'enregistrement de l'invité.");
+      });
   };
 
   const handleExportCSV = () => {
@@ -285,7 +368,7 @@ export default function Organisateur() {
             className="space-y-8"
           >
             {/* Header section with credentials check and logs */}
-            <div className="flex flex-col sm:flex-row justify-between items-center bg-[#141414] border border-[#D4AF37]/30 p-6 rounded-2xl gap-4">
+            <div className="flex flex-col md:flex-row justify-between items-center bg-[#141414] border border-[#D4AF37]/30 p-6 rounded-2xl gap-4">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg">
                   <ShieldCheck className="w-5 h-5" />
@@ -296,7 +379,21 @@ export default function Organisateur() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2.5 justify-center sm:justify-end">
+                <button
+                  onClick={() => {
+                    setShowManualForm(!showManualForm);
+                    setManualSuccessMsg("");
+                    setManualErrorMsg("");
+                  }}
+                  className={`px-4 py-2 font-bold uppercase tracking-widest text-[10px] rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
+                    showManualForm
+                      ? "bg-[#8C5333] text-white border border-[#AA7C11]/30"
+                      : "bg-[#141414] text-[#D4AF37] border border-[#D4AF37]/45 hover:bg-[#D4AF37]/10"
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" /> {showManualForm ? "ANNULER L'AJOUT" : "AJOUTER UN INVITÉ (+)"}
+                </button>
                 <button
                   onClick={handleExportCSV}
                   disabled={allRSVPs.length === 0}
@@ -312,6 +409,163 @@ export default function Organisateur() {
                 </button>
               </div>
             </div>
+
+            {/* Manual entry Form */}
+            <AnimatePresence>
+              {showManualForm && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, height: "auto", scale: 1 }}
+                  exit={{ opacity: 0, height: 0, scale: 0.98 }}
+                  className="overflow-hidden"
+                >
+                  <form
+                    onSubmit={handleManualSubmit}
+                    className="p-6 md:p-8 rounded-2xl bg-[#1C1C1C] border border-[#D4AF37]/40 text-left space-y-6 shadow-xl"
+                  >
+                    <div className="border-b border-[#D4AF37]/20 pb-4">
+                      <h3 className="font-serif text-xl font-bold text-gold-gradient">Ajouter une confirmation manuelle</h3>
+                      <p className="font-sans text-xs text-[#F8F5F0]/60 mt-1">
+                        Utilisez ce formulaire pour réintégrer manuellement un invité qui avait déjà fait sa confirmation avant la mise à jour, ou pour enregistrer une personne reçue par appel / message de vive voix.
+                      </p>
+                    </div>
+
+                    {manualSuccessMsg && (
+                      <div className="p-4 bg-emerald-950/50 border border-emerald-500/30 text-emerald-300 text-xs rounded-xl flex items-center gap-2">
+                        <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>{manualSuccessMsg}</span>
+                      </div>
+                    )}
+
+                    {manualErrorMsg && (
+                      <div className="p-4 bg-red-950/50 border border-red-500/30 text-red-300 text-xs rounded-xl flex items-center gap-2">
+                        <ShieldAlert className="w-4 h-4 text-red-400 shrink-0" />
+                        <span>{manualErrorMsg}</span>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Name */}
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-mono uppercase tracking-wider text-[#D4AF37] font-semibold">
+                          Nom complet de l'invité *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={manualName}
+                          onChange={(e) => setManualName(e.target.value)}
+                          placeholder="Ex: Mme Sanon Fatoumata"
+                          className="w-full bg-[#141414] text-[#F8F5F0] border border-[#D4AF37]/15 focus:border-[#D4AF37] rounded-xl px-4 py-3 outline-none text-xs transition-colors"
+                        />
+                      </div>
+
+                      {/* Phone */}
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-mono uppercase tracking-wider text-[#D4AF37] font-semibold">
+                          Numéro de téléphone
+                        </label>
+                        <input
+                          type="text"
+                          value={manualPhone}
+                          onChange={(e) => setManualPhone(e.target.value)}
+                          placeholder="Ex: +226 70 00 00 00"
+                          className="w-full bg-[#141414] text-[#F8F5F0] border border-[#D4AF37]/15 focus:border-[#D4AF37] rounded-xl px-4 py-3 outline-none text-xs transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                      {/* Is Attending Toggle */}
+                      <div className="space-y-2">
+                        <label className="block text-[10px] font-mono uppercase tracking-wider text-[#D4AF37] font-semibold">
+                          Réponse de l'invité
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setManualIsAttending(true)}
+                            className={`py-3 rounded-xl font-bold uppercase text-[10px] tracking-widest border transition-all cursor-pointer ${
+                              manualIsAttending
+                                ? "bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]"
+                                : "bg-[#141414]/40 text-[#F8F5F0]/60 border-[#D4AF37]/10 hover:border-[#D4AF37]/30"
+                            }`}
+                          >
+                            PRÉSENT(E)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setManualIsAttending(false)}
+                            className={`py-3 rounded-xl font-bold uppercase text-[10px] tracking-widest border transition-all cursor-pointer ${
+                              !manualIsAttending
+                                ? "bg-red-500/10 text-red-400 border-red-500/50"
+                                : "bg-[#141414]/40 text-[#F8F5F0]/60 border-[#D4AF37]/10 hover:border-[#D4AF37]/30"
+                            }`}
+                          >
+                            ABSENT(E)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Accompaniments (Only if attending) */}
+                      {manualIsAttending && (
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-mono uppercase tracking-wider text-[#D4AF37] font-semibold">
+                            Nombre de places (invités)
+                          </label>
+                          <div className="flex items-center gap-3">
+                            {[1, 2, 3, 4, 5].map((num) => (
+                              <button
+                                key={num}
+                                type="button"
+                                onClick={() => setManualGuestsCount(num)}
+                                className={`w-10 h-10 rounded-xl font-mono text-xs font-bold border transition-all cursor-pointer flex items-center justify-center ${
+                                  manualGuestsCount === num
+                                    ? "bg-[#D4AF37] text-black border-[#D4AF37]"
+                                    : "bg-[#141414] text-[#F8F5F0]/80 border-[#D4AF37]/15 hover:border-[#D4AF37]/40"
+                                }`}
+                              >
+                                {num}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Vows / Notes */}
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-mono uppercase tracking-wider text-[#D4AF37] font-semibold">
+                        Bénédictions / Vœux / Notes pour Mme Alima OUEDRAOGO
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={manualNotes}
+                        onChange={(e) => setManualNotes(e.target.value)}
+                        placeholder="Insérer ses vœux, message de bénédiction ou remarques ici..."
+                        className="w-full bg-[#141414] text-[#F8F5F0] border border-[#D4AF37]/15 focus:border-[#D4AF37] rounded-xl px-4 py-3 outline-none text-xs transition-colors resize-none animate-none"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowManualForm(false)}
+                        className="px-5 py-3 border border-[#D4AF37]/25 text-[#F8F5F0]/75 hover:bg-[#D4AF37]/5 font-serif text-xs font-semibold rounded-xl cursor-pointer"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-6 py-3 bg-gold-gradient text-black font-bold uppercase tracking-wider text-[10px] rounded-xl hover:shadow-[0_4px_20px_rgba(212,175,55,0.3)] transition-all cursor-pointer"
+                      >
+                        Enregistrer l'invité
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Real-time Confirmation Notifications Feed */}
             <div className="bg-[#141414] border border-[#D4AF37]/30 rounded-2xl p-6 space-y-4 text-left">
