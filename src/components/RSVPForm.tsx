@@ -116,6 +116,13 @@ export default function RSVPForm() {
     setRecentRSVP(newRsvp);
     setSubmitted(true);
 
+    // Amener automatiquement l'invité sur le sondage Google Forms après confirmation s'il participe
+    if (isAttending) {
+      setTimeout(() => {
+        window.location.href = "https://docs.google.com/forms/d/e/1FAIpQLScmXWPfHg5jrcZhe4zjgrTtB9_T_UhcfD20wL1yMIginywOXA/viewform?usp=publish-editor";
+      }, 1200);
+    }
+
     // Reset fields except for success screen display
     setName("");
     setPhone("");
@@ -146,7 +153,7 @@ export default function RSVPForm() {
                 Participer à la Magie
               </span>
               <h3 className="font-serif text-3xl font-light text-[#F8F5F0] leading-tight">
-                Réservez Votre Table pour le <span className="text-gold-gradient italic font-bold">Chic Royal</span>
+                Confirmez Votre Présence pour le <span className="text-gold-gradient italic font-bold">Chic Royal</span>
               </h3>
               <p className="font-sans text-xs text-[#F8F5F0]/70 leading-relaxed font-light">
                 Chaque convive recevra un carton d'invitation virtuel muni d'un code d'identification VIP unique, à présenter le soir de l'événement à la Salle KADIOGO à l'Azalaï Hôtel.
@@ -318,6 +325,21 @@ export default function RSVPForm() {
                   ? "Votre présence a été enregistrée avec succès. Voici votre précieux sésame VIP." 
                   : "Votre absence excusée a bien été enregistrée. Merci pour vos tendres pensées."}
               </p>
+
+              {/* Post-RSVP survey gentle invitation block */}
+              {recentRSVP?.isAttending && (
+                <div className="max-w-md p-4 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-center space-y-2 mt-3 mx-auto">
+                  <p className="font-sans text-xs text-[#FFF9E6]">
+                    🎵 <span className="font-bold text-[#D4AF37]">Redirection en cours...</span> Nous vous redirigeons vers Google Forms pour soumettre vos musiques préférées !
+                  </p>
+                  <a
+                    href="https://docs.google.com/forms/d/e/1FAIpQLScmXWPfHg5jrcZhe4zjgrTtB9_T_UhcfD20wL1yMIginywOXA/viewform?usp=publish-editor"
+                    className="inline-block text-xxs font-mono uppercase tracking-widest text-[#D4AF37] hover:text-[#FFF] hover:underline font-bold"
+                  >
+                    Cliquez ici si vous n'êtes pas redirigé(e) automatiquement →
+                  </a>
+                </div>
+              )}
             </div>
 
             {/* Luxury VIP digital printable pass */}

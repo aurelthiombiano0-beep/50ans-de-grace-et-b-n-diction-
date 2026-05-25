@@ -339,6 +339,47 @@ export default function App() {
             <Countdown />
           </section>
 
+          {/* 9.5 SONDAGE & PRÉFÉRENCES (Google Forms) */}
+          <section id="survey-section" className="py-20 px-6 relative bg-gradient-to-b from-[#141414]/15 via-[#1a1a1a]/30 to-transparent border-b border-[#D4AF37]/15 overflow-hidden">
+            {/* Ambient gold glow */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[25vh] bg-[#AA7C11]/5 rounded-full blur-[100px] pointer-events-none" />
+            <div className="absolute inset-0 bg-african-pattern opacity-3 pointer-events-none" />
+            
+            <div className="max-w-4xl mx-auto text-center space-y-8 relative z-10">
+              <div className="space-y-3">
+                <span className="font-sans text-[10px] uppercase tracking-[0.35em] text-[#D4AF37] font-bold block animate-pulse">
+                  Votre avis compte
+                </span>
+                <h2 className="font-serif text-3xl sm:text-4xl font-light text-[#F8F5F0]">
+                  Sondage de <span className="text-gold-gradient italic font-bold">Préférences Musicales</span>
+                </h2>
+                <div className="w-12 h-[1px] bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent mx-auto mt-2" />
+              </div>
+
+              <div className="max-w-2xl mx-auto p-8 rounded-2xl bg-[#141414]/90 border border-[#D4AF37]/25 space-y-6 shadow-2xl">
+                <p className="font-sans text-xs sm:text-sm text-[#F8F5F0]/80 leading-relaxed font-light">
+                  Afin de rendre cette soirée inoubliable, la commission d'organisation invite chaleureusement chaque convive à remplir notre petit sondage de préparation (choix de vos titres musicaux préférés, préférences artistiques, etc.).
+                </p>
+
+                <div className="flex flex-col sm:flex-row justify-center items-center gap-4 pt-2">
+                  <a
+                    href="https://docs.google.com/forms/d/e/1FAIpQLScmXWPfHg5jrcZhe4zjgrTtB9_T_UhcfD20wL1yMIginywOXA/viewform?usp=publish-editor"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2.5 bg-gold-gradient text-black font-extrabold uppercase tracking-widest text-xs px-8 py-4.5 rounded-xl cursor-pointer hover:shadow-[0_10px_25px_rgba(212,175,55,0.4)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    <Music className="w-4 h-4 text-black shrink-0" />
+                    PARTICIPER AU SONDAGE d'ORGANISTRATION
+                  </a>
+                </div>
+
+                <p className="font-sans text-[10px] text-[#D4AF37]/60 tracking-wider">
+                  * Le formulaire officiel de sondage Google Forms s'ouvrira en toute sécurité dans un nouvel onglet.
+                </p>
+              </div>
+            </div>
+          </section>
+
           {/* 10. RSVP ACTION FORM SECTION */}
           <section className="py-24 px-6 relative bg-[#111111]/15 border-b border-[#D4AF37]/15">
             <RSVPForm />
